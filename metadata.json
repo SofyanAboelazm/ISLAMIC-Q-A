@@ -1,5 +1,5 @@
 {
   "name": "أسئلة دينية إسلامية",
   "description": "منصة إسلامية للبحث عن الإجابات الدينية الموثوقة من المصادر الأصلية مثل صحيح البخاري ومسلم وتفسير ابن كثير.",
-  "requestFramePermissions": []
+  "requestFramePermissions": ["microphone"]
 }

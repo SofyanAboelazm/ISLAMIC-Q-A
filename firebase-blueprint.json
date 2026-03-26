@@ -35,6 +35,55 @@
         }
       },
       "required": ["userId", "query", "answer", "timestamp"]
+    },
+    "ChatSession": {
+      "title": "Chat Session",
+      "description": "A chat session between a user and the AI",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "lastMessage": { "type": "string" }
+      },
+      "required": ["userId", "title", "createdAt", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "A message in a chat session",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["user", "model"] },
+        "content": { "type": "string" },
+        "userId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["role", "content", "userId", "timestamp"]
+    },
+    "VoiceChatSession": {
+      "title": "Voice Chat Session",
+      "description": "A voice chat session between a user and the AI",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "voiceType": { "type": "string", "enum": ["male", "female"] },
+        "title": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "voiceType", "title", "createdAt", "updatedAt"]
+    },
+    "VoiceChatMessage": {
+      "title": "Voice Chat Message",
+      "description": "A message in a voice chat session",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string", "enum": ["user", "model"] },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["role", "content", "timestamp"]
     }
   },
   "firestore": {
@@ -45,6 +94,22 @@
     "/searchHistory/{historyId}": {
       "schema": "SearchHistory",
       "description": "Search history records"
+    },
+    "/chatSessions/{sessionId}": {
+      "schema": "ChatSession",
+      "description": "Chat session documents"
+    },
+    "/chatSessions/{sessionId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Messages within a chat session"
+    },
+    "/voiceChatSessions/{sessionId}": {
+      "schema": "VoiceChatSession",
+      "description": "Voice chat session documents"
+    },
+    "/voiceChatSessions/{sessionId}/messages/{messageId}": {
+      "schema": "VoiceChatMessage",
+      "description": "Messages within a voice chat session"
     }
   }
 }

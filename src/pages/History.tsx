@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { db, collection, query, where, orderBy, onSnapshot } from '../lib/firebase';
+import { db, collection, query, where, orderBy, onSnapshot, handleFirestoreError, OperationType } from '../lib/firebase';
 import { SearchHistoryItem } from '../types';
 import { History as HistoryIcon, Search, Calendar, ChevronLeft, LogIn, Loader2, Trash2, ChevronRight } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -108,7 +108,7 @@ const History: React.FC = () => {
       setHistory(items);
       setLoading(false);
     }, (error) => {
-      console.error("History Error:", error);
+      handleFirestoreError(error, OperationType.GET, 'searchHistory');
       setLoading(false);
     });
 
@@ -161,44 +161,46 @@ const History: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold text-stone-900 flex items-center gap-3">
-          <HistoryIcon size={32} className="text-green-600" />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
+        <h1 className="text-2xl sm:text-3xl font-bold text-stone-900 flex items-center gap-3">
+          <HistoryIcon size={28} className="text-green-600 sm:hidden" />
+          <HistoryIcon size={32} className="text-green-600 hidden sm:block" />
           {t.title}
         </h1>
-        <span className="text-sm text-stone-500 font-medium">{history.length} {t.searchCount}</span>
+        <span className="text-xs sm:text-sm text-stone-500 font-medium bg-stone-100 px-3 py-1 rounded-full">{history.length} {t.searchCount}</span>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 px-1">
         {history.map((item, i) => (
           <motion.div
             key={item.id}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
-            className="bg-white p-6 rounded-2xl border border-stone-100 shadow-sm hover:shadow-md transition-all group cursor-pointer"
+            className="bg-white p-4 sm:p-6 rounded-xl sm:rounded-2xl border border-stone-100 shadow-sm hover:shadow-md transition-all group cursor-pointer"
             onClick={() => navigate(`/results?q=${encodeURIComponent(item.query)}`)}
           >
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-2 flex-grow">
-                <div className="flex items-center gap-2 text-xs text-stone-400 font-medium">
-                  <Calendar size={14} />
+                <div className="flex items-center gap-2 text-[10px] sm:text-xs text-stone-400 font-medium">
+                  <Calendar size={12} className="sm:hidden" />
+                  <Calendar size={14} className="hidden sm:block" />
                   <span>{item.timestamp?.toDate().toLocaleDateString(t.dateLocale, { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                   {item.language && (
                     <span className="bg-stone-100 px-2 py-0.5 rounded uppercase text-[10px] font-bold text-stone-500">{item.language}</span>
                   )}
                 </div>
-                <h3 className={`text-lg font-bold text-stone-800 group-hover:text-green-600 transition-colors ${item.language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <h3 className={`text-base sm:text-lg font-bold text-stone-800 group-hover:text-green-600 transition-colors ${item.language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {item.query}
                 </h3>
-                <p className={`text-stone-500 text-sm line-clamp-2 leading-relaxed ${item.language === 'ar' ? 'text-right' : 'text-left'}`}>
+                <p className={`text-stone-500 text-xs sm:text-sm line-clamp-2 leading-relaxed ${item.language === 'ar' ? 'text-right' : 'text-left'}`}>
                   {item.answer}
                 </p>
               </div>
               
-              <div className="flex flex-col items-end gap-4">
-                <div className="w-10 h-10 rounded-full bg-stone-50 flex items-center justify-center text-stone-400 group-hover:bg-green-50 group-hover:text-green-600 transition-all">
-                  {language === 'ar' ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+              <div className="flex flex-col items-end gap-4 self-center">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-stone-50 flex items-center justify-center text-stone-400 group-hover:bg-green-50 group-hover:text-green-600 transition-all">
+                  {language === 'ar' ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
                 </div>
               </div>
             </div>

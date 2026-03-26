@@ -52,6 +52,32 @@ service cloud.firestore {
              data.answer is string && data.answer.size() < 10000;
     }
 
+    function isValidChatSession(data) {
+      return data.keys().hasAll(['userId', 'title', 'createdAt', 'updatedAt']) &&
+             data.userId == request.auth.uid &&
+             data.title is string && data.title.size() < 200;
+    }
+
+    function isValidChatMessage(data) {
+      return data.keys().hasAll(['role', 'content', 'timestamp', 'userId']) &&
+             data.role in ['user', 'model'] &&
+             data.userId == request.auth.uid &&
+             data.content is string && data.content.size() < 5000;
+    }
+
+    function isValidVoiceChatSession(data) {
+      return data.keys().hasAll(['userId', 'voiceType', 'title', 'createdAt', 'updatedAt']) &&
+             data.userId == request.auth.uid &&
+             data.voiceType in ['male', 'female'] &&
+             data.title is string && data.title.size() < 200;
+    }
+
+    function isValidVoiceChatMessage(data) {
+      return data.keys().hasAll(['role', 'content', 'timestamp']) &&
+             data.role in ['user', 'model'] &&
+             data.content is string && data.content.size() < 5000;
+    }
+
     match /users/{userId} {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId) && isValidUser(request.resource.data);
@@ -61,7 +87,34 @@ service cloud.firestore {
     match /searchHistory/{historyId} {
       allow read: if isDocOwner();
       allow create: if isAuthenticated() && isValidSearchHistory(request.resource.data);
+      allow update: if isDocOwner();
       allow delete: if isDocOwner();
+    }
+
+    match /chatSessions/{sessionId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidChatSession(request.resource.data);
+      allow update: if isDocOwner() && isValidChatSession(request.resource.data);
+      allow delete: if isDocOwner();
+
+      match /messages/{messageId} {
+        allow read: if get(/databases/$(database)/documents/chatSessions/$(sessionId)).data.userId == request.auth.uid;
+        allow create: if isAuthenticated() && isValidChatMessage(request.resource.data) && 
+                      get(/databases/$(database)/documents/chatSessions/$(sessionId)).data.userId == request.auth.uid;
+      }
+    }
+
+    match /voiceChatSessions/{sessionId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && isValidVoiceChatSession(request.resource.data);
+      allow update: if isDocOwner() && isValidVoiceChatSession(request.resource.data);
+      allow delete: if isDocOwner();
+
+      match /messages/{messageId} {
+        allow read: if get(/databases/$(database)/documents/voiceChatSessions/$(sessionId)).data.userId == request.auth.uid;
+        allow create: if isAuthenticated() && isValidVoiceChatMessage(request.resource.data) && 
+                      get(/databases/$(database)/documents/voiceChatSessions/$(sessionId)).data.userId == request.auth.uid;
+      }
     }
   }
 }

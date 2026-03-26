@@ -130,49 +130,50 @@ const Home: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="text-center mb-12">
+      <div className="text-center mb-8 sm:mb-12">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: "spring", stiffness: 100 }}
-          className="inline-block p-4 bg-green-50 rounded-full mb-6"
+          className="inline-block p-3 sm:p-4 bg-green-50 rounded-full mb-4 sm:mb-6"
         >
-          <BookOpen size={48} className="text-green-600" />
+          <BookOpen size={32} className="text-green-600 sm:hidden" />
+          <BookOpen size={48} className="text-green-600 hidden sm:block" />
         </motion.div>
-        <h1 className="text-4xl md:text-5xl font-bold text-stone-900 mb-4 leading-tight">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-stone-900 mb-4 leading-tight px-2">
           {t.title.split(' ').map((word, i) => (
             <span key={i} className={word === 'بثقة' || word === 'confidence' || word === 'confiance' || word === 'vertrauensvoll' || word === 'confianza' || word === 'percaya' ? 'text-green-600' : ''}>
               {word}{' '}
             </span>
           ))}
         </h1>
-        <p className="text-stone-600 text-lg max-w-2xl mx-auto">
+        <p className="text-stone-600 text-base sm:text-lg max-w-2xl mx-auto px-4">
           {t.subtitle}
         </p>
       </div>
 
-      <form onSubmit={handleSearch} className="relative mb-12">
+      <form onSubmit={handleSearch} className="relative mb-8 sm:mb-12 px-2">
         <div className="relative group">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t.placeholder}
-            className={`w-full h-16 rounded-2xl border-2 border-stone-200 bg-white text-lg focus:border-green-500 focus:ring-4 focus:ring-green-500/10 transition-all outline-none shadow-xl group-hover:border-stone-300 ${language === 'ar' ? 'pr-14 pl-32' : 'pl-14 pr-32'}`}
+            className={`w-full h-14 sm:h-16 rounded-xl sm:rounded-2xl border-2 border-stone-200 bg-white text-base sm:text-lg focus:border-green-500 focus:ring-4 focus:ring-green-500/10 transition-all outline-none shadow-lg sm:shadow-xl group-hover:border-stone-300 ${language === 'ar' ? 'pr-12 pl-24 sm:pr-14 sm:pl-32' : 'pl-12 pr-24 sm:pl-14 sm:pr-32'}`}
           />
-          <Search className={`absolute top-1/2 -translate-y-1/2 text-stone-400 group-focus-within:text-green-600 transition-colors ${language === 'ar' ? 'right-5' : 'left-5'}`} size={24} />
+          <Search className={`absolute top-1/2 -translate-y-1/2 text-stone-400 group-focus-within:text-green-600 transition-colors ${language === 'ar' ? 'right-4 sm:right-5' : 'left-4 sm:left-5'}`} size={20} />
           <button
             type="submit"
             disabled={!query.trim() || isSearching}
-            className={`absolute top-1/2 -translate-y-1/2 h-10 px-6 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center gap-2 ${language === 'ar' ? 'left-3' : 'right-3'}`}
+            className={`absolute top-1/2 -translate-y-1/2 h-8 sm:h-10 px-4 sm:px-6 bg-green-600 text-white rounded-lg sm:rounded-xl font-bold hover:bg-green-700 active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center gap-1 sm:gap-2 ${language === 'ar' ? 'left-2 sm:left-3' : 'right-2 sm:right-3'}`}
           >
-            {isSearching ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />}
-            <span>{t.search}</span>
+            {isSearching ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+            <span className="text-xs sm:text-sm">{t.search}</span>
           </button>
         </div>
       </form>
 
-      <div className="grid md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 px-2">
         <div className="bg-white p-6 rounded-2xl border border-stone-100 shadow-sm">
           <div className="flex items-center gap-2 mb-4 text-green-700 font-bold">
             <MessageCircleQuestion size={20} />

@@ -1,14 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import React, { useEffect, useState, useRef } from 'react';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { searchIslamicQuestion, getNoAnswerFound } from '../services/geminiService';
 import { SearchResult } from '../types';
-import { Loader2, AlertCircle, Book, User, Hash, ChevronLeft, ArrowRight, Share2, Bookmark, ArrowLeft } from 'lucide-react';
+import { Loader2, AlertCircle, Book, User, Hash, ChevronLeft, ArrowRight, Share2, Bookmark, ArrowLeft, Printer, FileDown } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../hooks/useAuth';
-import { db, collection, addDoc, serverTimestamp } from '../lib/firebase';
+import { db, collection, addDoc, serverTimestamp, doc, getDoc, updateDoc, storage, ref, uploadBytes, getDownloadURL } from '../lib/firebase';
 import ReactMarkdown from 'react-markdown';
+import PrintableResult from '../components/PrintableResult';
+import ShareMenu from '../components/ShareMenu';
+import SocialCard from '../components/SocialCard';
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
+// @ts-ignore
+import html2canvas from 'html2canvas';
 
 const translations = {
+  // ... (keep translations as is)
   ar: {
     loading: "جاري البحث في المصادر الموثوقة...",
     error: "حدث خطأ أثناء البحث. يرجى المحاولة مرة أخرى.",
@@ -25,7 +33,8 @@ const translations = {
     viewDetails: "عرض التفاصيل",
     source: "المصدر",
     book: "الكتاب",
-    reference: "المرجع"
+    reference: "المرجع",
+    printPdf: "طباعة / حفظ PDF"
   },
   en: {
     loading: "Searching in reliable sources...",
@@ -43,7 +52,8 @@ const translations = {
     viewDetails: "View Details",
     source: "Source",
     book: "Book",
-    reference: "Reference"
+    reference: "Reference",
+    printPdf: "Print / Save PDF"
   },
   fr: {
     loading: "Recherche dans des sources fiables...",
@@ -61,7 +71,8 @@ const translations = {
     viewDetails: "Voir les détails",
     source: "Source",
     book: "Livre",
-    reference: "Référence"
+    reference: "Référence",
+    printPdf: "Imprimer / Enregistrer PDF"
   },
   de: {
     loading: "Suche in zuverlässigen Quellen...",
@@ -79,7 +90,8 @@ const translations = {
     viewDetails: "Details anzeigen",
     source: "Quelle",
     book: "Buch",
-    reference: "Referenz"
+    reference: "Referenz",
+    printPdf: "Drucken / Als PDF speichern"
   },
   es: {
     loading: "Buscando en fuentes confiables...",
@@ -97,7 +109,8 @@ const translations = {
     viewDetails: "Ver detalles",
     source: "Fuente",
     book: "Libro",
-    reference: "Referencia"
+    reference: "Referencia",
+    printPdf: "Imprimir / Guardar PDF"
   },
   id: {
     loading: "Mencari di sumber terpercaya...",
@@ -115,39 +128,77 @@ const translations = {
     viewDetails: "Lihat Detail",
     source: "Sumber",
     book: "Buku",
-    reference: "Referensi"
+    reference: "Referensi",
+    printPdf: "Cetak / Simpan PDF"
   }
 };
 
 const Results: React.FC = () => {
-  const [searchParams] = useSearchParams();
-  const query = searchParams.get('q');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryParam = searchParams.get('q');
+  const idParam = searchParams.get('id');
   const [result, setResult] = useState<SearchResult | null>(null);
+  const [query, setQuery] = useState<string | null>(queryParam);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [resultId, setResultId] = useState<string | null>(idParam);
+  const [isGeneratingCard, setIsGeneratingCard] = useState(false);
   const { user, language } = useAuth();
   const t = translations[language];
   const noAnswerMsg = getNoAnswerFound(language);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const performSearch = async () => {
-      if (!query) return;
+      if (idParam) {
+        setLoading(true);
+        try {
+          const docRef = doc(db, 'searchHistory', idParam);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setResult({
+              answer: data.answer,
+              dalil: data.dalil || '',
+              references: data.references || []
+            });
+            setQuery(data.query);
+            setResultId(idParam);
+            setLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.error("Error fetching result by ID:", err);
+        }
+      }
+
+      if (!queryParam) {
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
       try {
-        const data = await searchIslamicQuestion(query, language);
+        const data = await searchIslamicQuestion(queryParam, language);
         setResult(data);
+        setQuery(queryParam);
         
-        // Save to history if user is logged in
-        if (user && data?.answer && data.answer !== noAnswerMsg) {
-          await addDoc(collection(db, 'searchHistory'), {
-            userId: user.uid,
-            query: query || '',
+        // Save to history and get ID
+        if (data?.answer && data.answer !== noAnswerMsg) {
+          const docRef = await addDoc(collection(db, 'searchHistory'), {
+            userId: user?.uid || 'anonymous',
+            query: queryParam || '',
             answer: data.answer,
+            dalil: data.dalil || '',
             references: data.references || [],
             language: language,
             timestamp: serverTimestamp(),
           });
+          setResultId(docRef.id);
+          // Update URL to include ID for sharing
+          setSearchParams({ q: queryParam, id: docRef.id });
         }
       } catch (err) {
         console.error(err);
@@ -158,7 +209,102 @@ const Results: React.FC = () => {
     };
 
     performSearch();
-  }, [query, user, language, noAnswerMsg, t.error]);
+  }, [queryParam, idParam, user, language, noAnswerMsg, t.error, setSearchParams]);
+
+  // Social Card Generation
+  useEffect(() => {
+    const generateSocialCard = async () => {
+      if (!result || !resultId || !query || isGeneratingCard) return;
+
+      // Check if image already exists in doc
+      try {
+        const docRef = doc(db, 'searchHistory', resultId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists() && docSnap.data().ogImageUrl) {
+          return;
+        }
+      } catch (err) {
+        console.error("Error checking for existing OG image:", err);
+      }
+
+      setIsGeneratingCard(true);
+      
+      // Wait for the card to be rendered
+      setTimeout(async () => {
+        const element = document.getElementById('social-card-capture');
+        if (!element) {
+          setIsGeneratingCard(false);
+          return;
+        }
+
+        try {
+          const canvas = await html2canvas(element, {
+            width: 1200,
+            height: 630,
+            scale: 1,
+            useCORS: true,
+            backgroundColor: '#ffffff'
+          });
+
+          canvas.toBlob(async (blob: Blob | null) => {
+            if (!blob) {
+              setIsGeneratingCard(false);
+              return;
+            }
+
+            const imageRef = ref(storage, `generated-cards/${resultId}.png`);
+            await uploadBytes(imageRef, blob);
+            const downloadUrl = await getDownloadURL(imageRef);
+
+            // Update Firestore with the image URL
+            await updateDoc(doc(db, 'searchHistory', resultId), {
+              ogImageUrl: downloadUrl
+            });
+            
+            setIsGeneratingCard(false);
+          }, 'image/png');
+        } catch (err) {
+          console.error("Error generating social card:", err);
+          setIsGeneratingCard(false);
+        }
+      }, 1000); // Give it time to render
+    };
+
+    if (result && resultId && query) {
+      generateSocialCard();
+    }
+  }, [result, resultId, query, isGeneratingCard]);
+
+  const handleExportPdf = async () => {
+    if (!result || !query) return;
+    
+    setIsPrinting(true);
+    
+    // Wait for the printable component to be rendered
+    setTimeout(async () => {
+      const element = document.getElementById('printable-content');
+      if (!element) {
+        setIsPrinting(false);
+        return;
+      }
+
+      const opt = {
+        margin: 10,
+        filename: `Islamic_QA_${new Date().getTime()}.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' as const }
+      };
+
+      try {
+        await html2pdf().set(opt).from(element).save();
+      } catch (err) {
+        console.error('PDF Export Error:', err);
+      } finally {
+        setIsPrinting(false);
+      }
+    }, 100);
+  };
 
   if (loading) {
     return (
@@ -220,26 +366,47 @@ const Results: React.FC = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-3xl p-8 md:p-12 shadow-xl border border-stone-100 mb-8"
+        className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-12 shadow-xl border border-stone-100 mb-8"
       >
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <span className="text-[10px] uppercase tracking-widest text-green-600 font-bold mb-2 block">{t.question}</span>
-          <h1 className="text-2xl md:text-3xl font-bold text-stone-900 leading-tight">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-stone-900 leading-tight">
             {query}
           </h1>
         </div>
 
-        <div className="mb-10">
+        <div className="mb-8 sm:mb-10">
           <span className="text-[10px] uppercase tracking-widest text-green-600 font-bold mb-4 block">{t.answer}</span>
-          <div className="markdown-body text-stone-800 leading-relaxed text-lg">
+          <div className="markdown-body text-stone-800 leading-relaxed text-base sm:text-lg mb-8">
             <ReactMarkdown>{result.answer}</ReactMarkdown>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <button 
+              onClick={handleExportPdf}
+              disabled={isPrinting}
+              className="flex items-center justify-center gap-2 bg-green-600 text-white px-6 py-3 rounded-full font-bold hover:bg-green-700 transition-all shadow-lg hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isPrinting ? (
+                <Loader2 className="animate-spin" size={20} />
+              ) : (
+                <FileDown size={20} />
+              )}
+              <span className="text-sm sm:text-base">{t.printPdf}</span>
+            </button>
+
+            {result && query && (
+              <div className="flex justify-center">
+                <ShareMenu query={query} result={result} language={language} />
+              </div>
+            )}
           </div>
         </div>
 
         {result.dalil && (
-          <div className="p-6 bg-green-50 rounded-2xl border border-green-100">
+          <div className="p-4 sm:p-6 bg-green-50 rounded-xl sm:rounded-2xl border border-green-100">
             <span className="text-[10px] uppercase tracking-widest text-green-600 font-bold mb-3 block">{t.dalil}</span>
-            <p className="text-green-900 font-medium italic text-lg leading-relaxed">
+            <p className="text-green-900 font-medium italic text-base sm:text-lg leading-relaxed">
               "{result.dalil}"
             </p>
           </div>
@@ -296,6 +463,20 @@ const Results: React.FC = () => {
             </motion.div>
           ))}
         </div>
+      </div>
+
+      {/* Hidden printable component */}
+      <div className="fixed left-[-9999px] top-0">
+        {isPrinting && result && query && (
+          <PrintableResult query={query} result={result} language={language} />
+        )}
+      </div>
+
+      {/* Hidden Social Card component for capture */}
+      <div className="fixed left-[-9999px] top-0">
+        {result && query && (
+          <SocialCard query={query} result={result} language={language} />
+        )}
       </div>
     </div>
   );
